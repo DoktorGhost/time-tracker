@@ -44,8 +44,26 @@ const docTemplate = `{
                             "type": "string"
                         }
                     },
+                    "404": {
+                        "description": "Задача не найдена",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "409": {
+                        "description": "Время старта уже задано",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     "422": {
                         "description": "Ошибка Task ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "428": {
+                        "description": "Не заполнено поле StartTime",
                         "schema": {
                             "type": "string"
                         }
@@ -84,6 +102,18 @@ const docTemplate = `{
                 "responses": {
                     "200": {
                         "description": "TaskID: {taskID}",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Задача не найдена",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "409": {
+                        "description": "Время начала уже установлено",
                         "schema": {
                             "type": "string"
                         }
@@ -141,6 +171,12 @@ const docTemplate = `{
                             "type": "string"
                         }
                     },
+                    "404": {
+                        "description": "Пользователь не найден",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     "422": {
                         "description": "Ошибка конвертирования UserID",
                         "schema": {
@@ -193,6 +229,12 @@ const docTemplate = `{
                             "type": "string"
                         }
                     },
+                    "409": {
+                        "description": "Ошибка записи: Пользователь с таким номером паспорта уже существует",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     "422": {
                         "description": "Ошибка валидации серии паспорта или номера паспорта",
                         "schema": {
@@ -201,6 +243,12 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Ошибка сервера",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "503": {
+                        "description": "Ошибка запроса к стороннему API",
                         "schema": {
                             "type": "string"
                         }
@@ -234,6 +282,12 @@ const docTemplate = `{
                 "responses": {
                     "200": {
                         "description": "Пользователь успешно удален",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Пользователь не найден",
                         "schema": {
                             "type": "string"
                         }
@@ -294,6 +348,12 @@ const docTemplate = `{
                             }
                         }
                     },
+                    "404": {
+                        "description": "Данные не найдены",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     "422": {
                         "description": "Неправильный ID пользователя",
                         "schema": {
@@ -336,6 +396,12 @@ const docTemplate = `{
                         "description": "Успешный ответ с данными пользователя",
                         "schema": {
                             "$ref": "#/definitions/models.UserData"
+                        }
+                    },
+                    "404": {
+                        "description": "Пользователь не найден",
+                        "schema": {
+                            "type": "string"
                         }
                     },
                     "422": {
@@ -440,6 +506,18 @@ const docTemplate = `{
                             "type": "string"
                         }
                     },
+                    "400": {
+                        "description": "Ошибка декодирования тела запроса",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "409": {
+                        "description": "Ошибка записи: Пользователь с таким номером паспорта уже существует",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     "422": {
                         "description": "Ошибка валидации серии паспорта или номера паспорта",
                         "schema": {
@@ -490,6 +568,24 @@ const docTemplate = `{
                 "responses": {
                     "200": {
                         "description": "Данные пользователя успешно обновлены",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Ошибка декодирования тела запроса",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Пользователь не найден",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "409": {
+                        "description": "Ошибка записи: Пользователь с таким номером паспорта уже существует",
                         "schema": {
                             "type": "string"
                         }
@@ -562,9 +658,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "passport_number": {
-                    "type": "string"
-                },
-                "passport_series": {
                     "type": "string"
                 },
                 "patronymic": {

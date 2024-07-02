@@ -6,7 +6,6 @@ import (
 
 type UserData struct {
 	UserID         string `json:"id"`
-	PassportSeries string `json:"passport_series"`
 	PassportNumber string `json:"passport_number"`
 	Surname        string `json:"surname"`
 	Name           string `json:"name"`
@@ -23,12 +22,12 @@ type TaskName struct {
 }
 
 type TaskData struct {
-	TaskID    string       `json:"id"`
-	UserID    string       `json:"user_id"`
-	NameTask  string       `json:"name_task"`
-	StartTime sql.NullTime `json:"start_time"`
-	EndTime   sql.NullTime `json:"end_time"`
-	AllTime   sql.NullTime `json:"all_time"`
+	TaskID    string        `json:"id"`
+	UserID    string        `json:"user_id"`
+	NameTask  string        `json:"name_task"`
+	StartTime sql.NullTime  `json:"start_time"`
+	EndTime   sql.NullTime  `json:"end_time"`
+	AllTime   sql.NullInt64 `json:"all_time"`
 }
 
 type TaskTime struct {

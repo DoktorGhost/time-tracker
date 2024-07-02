@@ -26,8 +26,7 @@ func GetPeopleInfoFromAPI(series, number, urlAPI string) (*models.UserData, erro
 	if err != nil {
 		return nil, fmt.Errorf("ошибка декодирования JSON: %v", err)
 	}
-	userInfo.PassportNumber = number
-	userInfo.PassportSeries = series
+	userInfo.PassportNumber = fmt.Sprintf("%s %s", series, number)
 
 	return &userInfo, nil
 }
