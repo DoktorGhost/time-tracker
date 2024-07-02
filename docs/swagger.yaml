@@ -1,0 +1,384 @@
+definitions:
+  models.PassportRequest:
+    properties:
+      passport_number:
+        type: string
+    type: object
+  models.TaskName:
+    properties:
+      task_name:
+        type: string
+    type: object
+  models.TaskTime:
+    properties:
+      end:
+        type: string
+      start:
+        type: string
+    type: object
+  models.Tasks:
+    properties:
+      all_time:
+        type: string
+      task_name:
+        type: string
+    type: object
+  models.UserData:
+    properties:
+      address:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      passport_number:
+        type: string
+      passport_series:
+        type: string
+      patronymic:
+        type: string
+      surname:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  title: Тайм-Трекер API
+  version: "1.0"
+paths:
+  /addTask/{userID}:
+    post:
+      consumes:
+      - application/json
+      description: Добавляет новую задачу для указанного пользователя.
+      parameters:
+      - description: ID пользователя
+        in: path
+        name: userID
+        required: true
+        type: integer
+      - description: Название задачи
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.TaskName'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'TaskID: {taskID}'
+          schema:
+            type: string
+        "422":
+          description: Ошибка конвертирования UserID
+          schema:
+            type: string
+        "500":
+          description: Ошибка сервера
+          schema:
+            type: string
+      summary: Добавление новой задачи
+      tags:
+      - Tasks
+  /addTask/endTime/{taskID}:
+    put:
+      consumes:
+      - application/json
+      description: Устанавливает время окончания выполнения задачи по её ID.
+      parameters:
+      - description: ID задачи
+        in: path
+        name: taskID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'TaskID: {taskID}'
+          schema:
+            type: string
+        "500":
+          description: Ошибка сервера
+          schema:
+            type: string
+      summary: Установка времени окончания задачи
+      tags:
+      - Tasks
+  /addTask/startTime/{taskID}:
+    put:
+      consumes:
+      - application/json
+      description: Устанавливает время начала выполнения задачи по её ID.
+      parameters:
+      - description: ID задачи
+        in: path
+        name: taskID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'TaskID: {taskID}'
+          schema:
+            type: string
+        "500":
+          description: Ошибка сервера
+          schema:
+            type: string
+      summary: Установка времени начала задачи
+      tags:
+      - Tasks
+  /addUser:
+    post:
+      consumes:
+      - application/json
+      description: Добавляет нового пользователя на основе серии и номера паспорта,
+        обогащает информацию через внешний API
+      parameters:
+      - description: Серия и номер пасспорта в формате `1234 123456` (4 цифры, пробел,
+          6 цифр)
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.PassportRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: UserID
+          schema:
+            type: string
+        "400":
+          description: Ошибка декодирования тела запроса
+          schema:
+            type: string
+        "422":
+          description: Ошибка валидации серии паспорта или номера паспорта
+          schema:
+            type: string
+        "500":
+          description: Ошибка сервера
+          schema:
+            type: string
+      summary: Добавление нового пользователя
+      tags:
+      - Users
+  /delUser/{userID}:
+    delete:
+      consumes:
+      - application/json
+      description: Удаляет пользователя из системы по его идентификатору.
+      parameters:
+      - description: User ID
+        format: int
+        in: path
+        name: userID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Пользователь успешно удален
+          schema:
+            type: string
+        "400":
+          description: Пустой ID
+          schema:
+            type: string
+        "422":
+          description: Ошибка конвертирования
+          schema:
+            type: string
+        "500":
+          description: Ошибка сервера
+          schema:
+            type: string
+      summary: Удаление пользователя по ID
+      tags:
+      - Users
+  /getTasks/{userID}:
+    post:
+      consumes:
+      - application/json
+      description: Возвращает список задач пользователя за указанный период времени.
+      parameters:
+      - description: ID пользователя
+        in: path
+        name: userID
+        required: true
+        type: integer
+      - description: Период времени
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.TaskTime'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Список задач пользователя
+          schema:
+            items:
+              $ref: '#/definitions/models.Tasks'
+            type: array
+        "400":
+          description: Не указан ID пользователя или неверный формат параметров периода
+            времени
+          schema:
+            type: string
+        "500":
+          description: Ошибка сервера
+          schema:
+            type: string
+      summary: Получение задач пользователя
+      tags:
+      - Tasks
+  /getUser/{userID}:
+    get:
+      consumes:
+      - application/json
+      description: Получает информацию о пользователе по его уникальному идентификатору.
+      parameters:
+      - description: User ID
+        in: path
+        name: userID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешный ответ с данными пользователя
+          schema:
+            $ref: '#/definitions/models.UserData'
+        "400":
+          description: Не указан ID пользователя или ID не является числом
+          schema:
+            type: string
+        "422":
+          description: Ошибка конвертирования ID
+          schema:
+            type: string
+        "500":
+          description: Ошибка сервера
+          schema:
+            type: string
+      summary: Получение информации о пользователе
+      tags:
+      - Users
+  /getUsers/{page}/{limit}:
+    post:
+      consumes:
+      - application/json
+      description: Возвращает список пользователей с возможностью фильтрации и пагинации.
+      parameters:
+      - description: Номер страницы
+        in: path
+        name: page
+        required: true
+        type: integer
+      - description: Количество элементов на странице
+        in: path
+        name: limit
+        required: true
+        type: integer
+      - description: Фильтр пользователей
+        in: body
+        name: body
+        schema:
+          $ref: '#/definitions/models.UserData'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешный ответ с данными пользователей
+          schema:
+            items:
+              $ref: '#/definitions/models.UserData'
+            type: array
+        "500":
+          description: Ошибка сервера
+          schema:
+            type: string
+      summary: Получение списка пользователей
+      tags:
+      - Users
+  /testAdd:
+    post:
+      consumes:
+      - application/json
+      description: Добавляет нового пользователя на основе серии и номера паспорта,
+        остальная информация берется рандомно, для тестирования и отладки запросов
+      parameters:
+      - description: Серия и номер пасспорта в формате `1234 123456` (4 цифры, пробел,
+          6 цифр)
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.PassportRequest'
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: UserID
+          schema:
+            type: string
+        "400":
+          description: Ошибка декодирования тела запроса
+          schema:
+            type: string
+        "422":
+          description: Ошибка валидации серии паспорта или номера паспорта
+          schema:
+            type: string
+        "500":
+          description: Ошибка сервера
+          schema:
+            type: string
+      summary: 'Тестовый хендлер: добавление пользователя в обход стороннего API'
+      tags:
+      - Users
+  /updUser/{userID}:
+    put:
+      consumes:
+      - application/json
+      description: Обновляет данные пользователя по его идентификатору.
+      parameters:
+      - description: User ID
+        format: int64
+        in: path
+        name: userID
+        required: true
+        type: integer
+      - description: Данные пользователя (неменяемые поля оставляем пустыми)
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.UserData'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Данные пользователя успешно обновлены
+          schema:
+            type: string
+        "422":
+          description: Ошибка валидации серии или номера паспорта
+          schema:
+            type: string
+        "500":
+          description: Ошибка сервера
+          schema:
+            type: string
+      summary: Обновление данных пользователя
+      tags:
+      - Users
+swagger: "2.0"
