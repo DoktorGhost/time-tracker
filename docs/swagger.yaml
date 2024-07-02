@@ -1,7 +1,7 @@
 definitions:
   models.PassportRequest:
     properties:
-      passport_number:
+      passportNumber:
         type: string
     type: object
   models.TaskName:
@@ -99,11 +99,15 @@ paths:
           description: 'TaskID: {taskID}'
           schema:
             type: string
+        "422":
+          description: Ошибка Task ID
+          schema:
+            type: string
         "500":
           description: Ошибка сервера
           schema:
             type: string
-      summary: Установка времени окончания задачи
+      summary: Закончить отсчет времени по задаче для пользователя
       tags:
       - Tasks
   /addTask/startTime/{taskID}:
@@ -124,11 +128,15 @@ paths:
           description: 'TaskID: {taskID}'
           schema:
             type: string
+        "422":
+          description: Ошибка Task ID
+          schema:
+            type: string
         "500":
           description: Ошибка сервера
           schema:
             type: string
-      summary: Установка времени начала задачи
+      summary: Начать отсчет времени по задаче для пользователя
       tags:
       - Tasks
   /addUser:
@@ -136,7 +144,8 @@ paths:
       consumes:
       - application/json
       description: Добавляет нового пользователя на основе серии и номера паспорта,
-        обогащает информацию через внешний API
+        обогащает информацию через внешний API (если в .env не указан URL API - получим
+        ответ 500)
       parameters:
       - description: Серия и номер пасспорта в формате `1234 123456` (4 цифры, пробел,
           6 цифр)
@@ -186,12 +195,8 @@ paths:
           description: Пользователь успешно удален
           schema:
             type: string
-        "400":
-          description: Пустой ID
-          schema:
-            type: string
         "422":
-          description: Ошибка конвертирования
+          description: Ошибка конвертирования ID
           schema:
             type: string
         "500":
@@ -212,7 +217,8 @@ paths:
         name: userID
         required: true
         type: integer
-      - description: Период времени
+      - description: 'Фильтрация по периоду времени: start - начало периода, end -
+          конец периода. Начало и конец прописывать в формате ДД.ММ.ГГГГ'
         in: body
         name: body
         required: true
@@ -227,9 +233,8 @@ paths:
             items:
               $ref: '#/definitions/models.Tasks'
             type: array
-        "400":
-          description: Не указан ID пользователя или неверный формат параметров периода
-            времени
+        "422":
+          description: Неправильный ID пользователя
           schema:
             type: string
         "500":
@@ -257,10 +262,6 @@ paths:
           description: Успешный ответ с данными пользователя
           schema:
             $ref: '#/definitions/models.UserData'
-        "400":
-          description: Не указан ID пользователя или ID не является числом
-          schema:
-            type: string
         "422":
           description: Ошибка конвертирования ID
           schema:
@@ -288,7 +289,8 @@ paths:
         name: limit
         required: true
         type: integer
-      - description: Фильтр пользователей
+      - description: Фильтр пользователей (выбираем по каким полям будет фильтрация,
+          вписываем туда ключ фильтра. Ненужные делаем пусытими или удаляем)
         in: body
         name: body
         schema:
@@ -330,10 +332,6 @@ paths:
           description: UserID
           schema:
             type: string
-        "400":
-          description: Ошибка декодирования тела запроса
-          schema:
-            type: string
         "422":
           description: Ошибка валидации серии паспорта или номера паспорта
           schema:
@@ -371,7 +369,7 @@ paths:
           schema:
             type: string
         "422":
-          description: Ошибка валидации серии или номера паспорта
+          description: Ошибка конвертирования ID
           schema:
             type: string
         "500":

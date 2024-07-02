@@ -11,7 +11,6 @@ import (
 	_ "github.com/lib/pq"
 	"strconv"
 	"sync"
-	"time"
 	"time-tracker/internal/config"
 	"time-tracker/internal/models"
 	"time-tracker/internal/validator"
@@ -305,17 +304,7 @@ WHERE id = $1;
 }
 
 func (p *PostgresStorage) GetTasksUser(userID int, timeTask models.TaskTime) ([]models.Tasks, error) {
-	// Преобразуем строки Start и End в тип time.Time
-	sTime, err := time.Parse("02.01.2006", timeTask.Start)
-	if err != nil {
-		return nil, err
-	}
-	eTime, err := time.Parse("02.01.2006", timeTask.End)
-	if err != nil {
-		return nil, err
-	}
-	startTime := sTime.Format("2006-01-02 15:04:05")
-	endTime := eTime.Format("2006-01-02 15:04:05")
+
 	query := `
         SELECT name_task, all_time
         FROM tasks
@@ -323,7 +312,7 @@ func (p *PostgresStorage) GetTasksUser(userID int, timeTask models.TaskTime) ([]
         ORDER BY all_time DESC;
     `
 
-	rows, err := p.db.Query(query, userID, startTime, endTime)
+	rows, err := p.db.Query(query, userID, timeTask.Start, timeTask.End)
 	if err != nil {
 		return nil, err
 	}

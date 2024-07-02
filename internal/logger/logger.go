@@ -35,7 +35,11 @@ var sugar *zap.SugaredLogger
 func InitLogger(logFile string) error {
 	// Настройка конфигурации логгера
 	cfg := zap.NewDevelopmentConfig()
-	cfg.OutputPaths = []string{logFile, "stdout"}
+	if logFile == "" {
+		cfg.OutputPaths = []string{"stdout"}
+	} else {
+		cfg.OutputPaths = []string{logFile, "stdout"}
+	}
 
 	// Настройка уровня логирования
 	cfg.Level.SetLevel(zapcore.DebugLevel)

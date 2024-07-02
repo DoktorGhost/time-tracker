@@ -1,0 +1,2 @@
+2024-07-02T16:20:48.317+0300	INFO	server/server.go:33	Старт сервера	{"addr": "localhost:8080"}
+2024-07-02T16:20:48.366+0300	FATAL	server/server.go:38	Ошибка при подключении к БД	{"error": "failed to connect to `user=admin database=postgres`:\n\t[::1]:5433 (localhost): failed to receive message: unexpected EOF\n\t127.0.0.1:5433 (localhost): failed to receive message: unexpected EOF"}
