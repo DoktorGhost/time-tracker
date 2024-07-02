@@ -7,17 +7,17 @@ import (
 	"time"
 )
 
-type (
-	responseData struct {
-		status int
-		size   int
-	}
+// структура для хранения данных о ответе
+type responseData struct {
+	status int
+	size   int
+}
 
-	loggingResponseWriter struct {
-		http.ResponseWriter
-		responseData *responseData
-	}
-)
+// Обёртка для http.ResponseWriter, чтобы мы могли перехватывать данные об ответе
+type loggingResponseWriter struct {
+	http.ResponseWriter
+	responseData *responseData
+}
 
 func (r *loggingResponseWriter) Write(b []byte) (int, error) {
 	size, err := r.ResponseWriter.Write(b)
@@ -32,39 +32,33 @@ func (r *loggingResponseWriter) WriteHeader(statusCode int) {
 
 var sugar *zap.SugaredLogger
 
-func InitLogger(logFilePath string) (*zap.SugaredLogger, error) {
-	config := zap.NewProductionConfig()
-	// Настройка пользовательского энкодера
-	encoderConfig := zapcore.EncoderConfig{
-		TimeKey:        "time",
-		LevelKey:       "level",
-		NameKey:        "logger",
-		CallerKey:      "caller",
-		MessageKey:     "msg",
-		StacktraceKey:  "stacktrace",
-		LineEnding:     zapcore.DefaultLineEnding,
-		EncodeLevel:    zapcore.CapitalLevelEncoder,
-		EncodeTime:     zapcore.ISO8601TimeEncoder,
-		EncodeDuration: zapcore.StringDurationEncoder,
-		EncodeCaller:   zapcore.ShortCallerEncoder,
+func InitLogger(logFile string) error {
+	// Настройка конфигурации логгера
+	cfg := zap.NewDevelopmentConfig()
+	cfg.OutputPaths = []string{logFile, "stdout"}
+
+	// Настройка уровня логирования
+	cfg.Level.SetLevel(zapcore.DebugLevel)
+
+	cfg.DisableStacktrace = true
+
+	// Создание логгера
+	logger, err := cfg.Build()
+	if err != nil {
+		return err
 	}
 
-	config.EncoderConfig = encoderConfig
-	config.OutputPaths = []string{
-		logFilePath,
-		"stdout",
-	}
-	logger, err := config.Build()
-	if err != nil {
-		return nil, err
-	}
-	return logger.Sugar(), nil
+	// Инициализация SugaredLogger
+	sugar = logger.Sugar()
+	return nil
 }
 
-// мидлвара логирования
+func SugaredLogger() *zap.SugaredLogger {
+	return sugar
+}
+
 func WithLogging(h http.Handler) http.Handler {
 	logFn := func(w http.ResponseWriter, r *http.Request) {
-		// возвращаем текущее время
 		start := time.Now()
 
 		responseData := &responseData{
@@ -78,16 +72,15 @@ func WithLogging(h http.Handler) http.Handler {
 		}
 		h.ServeHTTP(&lw, r)
 
-		// время выполнения запроса
 		duration := time.Since(start)
 
-		// отправляем сведения о запросе в zap
-		sugar.Infow("HTTP Request",
+		sugar.Infoln(
 			"uri", r.RequestURI,
 			"method", r.Method,
 			"status", responseData.status,
 			"duration", duration,
-			"size", responseData.size)
+			"size", responseData.size,
+		)
 	}
 	return http.HandlerFunc(logFn)
 }
