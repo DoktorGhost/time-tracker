@@ -2,9 +2,10 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	httpSwagger "github.com/swaggo/http-swagger/v2"
-	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -70,8 +71,10 @@ func InitRoutes(useCase usecase.UseCaseStorage, conf *config.Config) chi.Router 
 // @Param body body models.PassportRequest true "Серия и номер пасспорта в формате `1234 123456` (4 цифры, пробел, 6 цифр)"
 // @Success 200 {string} string "UserID"
 // @Failure 400 {string} string "Ошибка декодирования тела запроса"
+// @Failure 409 {string} string "Ошибка записи: Пользователь с таким номером паспорта уже существует"
 // @Failure 422 {string} string "Ошибка валидации серии паспорта или номера паспорта"
 // @Failure 500 {string} string "Ошибка сервера"
+// @Failure 503 {string} string "Ошибка запроса к стороннему API"
 // @Router /addUser [post]
 func HandlerAddUser(w http.ResponseWriter, r *http.Request, useCase usecase.UseCaseStorage, conf *config.Config) {
 	if r.Method != http.MethodPost {
@@ -85,51 +88,60 @@ func HandlerAddUser(w http.ResponseWriter, r *http.Request, useCase usecase.UseC
 
 	// Попытка декодировать JSON в структуру UserData
 	if err := dec.Decode(&req); err != nil {
-		logger.SugaredLogger().Errorw("Ошибка декодирования JSON", "error", err)
+		logger.SugaredLogger().Debug(err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	defer r.Body.Close()
 
 	parts := strings.Split(req.PassportNumber, " ")
-	passportSeries := parts[0]
 
-	if err := validator.ValidateDigits(passportSeries, 4); err != nil {
-		logger.SugaredLogger().Errorw("Ошибка валидации", "error", err)
-		w.WriteHeader(http.StatusUnprocessableEntity)
-		return
-	}
-	passportNumber := parts[1]
-
-	if err := validator.ValidateDigits(passportNumber, 6); err != nil {
-		logger.SugaredLogger().Errorw("Ошибка валидации", "error", err)
+	if err := validator.ValidateDigits(parts[0], 4); err != nil {
+		logger.SugaredLogger().Debug(err)
 		w.WriteHeader(http.StatusUnprocessableEntity)
 		return
 	}
 
-	userData, err := apiDataUser.GetPeopleInfoFromAPI(passportSeries, passportNumber, conf.API_URL)
+	if err := validator.ValidateDigits(parts[1], 6); err != nil {
+		logger.SugaredLogger().Debug(err)
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		return
+	}
+
+	userData, err := apiDataUser.GetPeopleInfoFromAPI(parts[0], parts[1], conf.API_URL)
 	if err != nil {
-		logger.SugaredLogger().Errorw("Ошибка запроса к стороннему API", "error", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		logger.SugaredLogger().Debug(err)
+		w.WriteHeader(http.StatusServiceUnavailable)
 		return
 	}
 
 	user_id, err := useCase.UseCaseCreate(*userData)
 	if err != nil {
-		logger.SugaredLogger().Errorw("Ошибка записи в БД", "error", err)
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) {
+			if pgErr.Code == "23505" {
+				logger.SugaredLogger().Debug(err)
+				w.WriteHeader(http.StatusConflict)
+				return
+			}
+		}
+		logger.SugaredLogger().Debug(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Ошибка записи в БД"))
+		return
+	}
+
+	response := map[string]int{"UserID": user_id}
+	res, err := json.Marshal(response)
+	if err != nil {
+		logger.SugaredLogger().Debug(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	response := map[string]int{"UserID": user_id}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	err = json.NewEncoder(w).Encode(response)
-	if err != nil {
-		// В случае ошибки кодируем JSON, лучше обработать её
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	w.Write(res)
 }
 
 // @Summary		Тестовый хендлер: добавление пользователя в обход стороннего API
@@ -139,6 +151,8 @@ func HandlerAddUser(w http.ResponseWriter, r *http.Request, useCase usecase.UseC
 // @Produce		plain
 // @Param		body	body		models.PassportRequest	true	"Серия и номер пасспорта в формате `1234 123456` (4 цифры, пробел, 6 цифр)"
 // @Success 200 {string} string "UserID"
+// @Failure 400 {string} string "Ошибка декодирования тела запроса"
+// @Failure 409 {string} string "Ошибка записи: Пользователь с таким номером паспорта уже существует"
 // @Failure 422 {string} string "Ошибка валидации серии паспорта или номера паспорта"
 // @Failure 500 {string} string "Ошибка сервера"
 // @Router	/testAdd [post]
@@ -149,7 +163,7 @@ func HandlerCreat(w http.ResponseWriter, r *http.Request, useCase usecase.UseCas
 
 	// Попытка декодировать JSON в структуру UserData
 	if err := dec.Decode(&req); err != nil {
-		logger.SugaredLogger().Errorw("Ошибка декодирования JSON", "error", err)
+		logger.SugaredLogger().Debug(err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -158,43 +172,52 @@ func HandlerCreat(w http.ResponseWriter, r *http.Request, useCase usecase.UseCas
 	parts := strings.Split(req.PassportNumber, " ")
 	passportSeries := parts[0]
 	if err := validator.ValidateDigits(passportSeries, 4); err != nil {
-		logger.SugaredLogger().Errorw("Ошибка валидации", "error", err)
+		logger.SugaredLogger().Debug(err)
 		w.WriteHeader(http.StatusUnprocessableEntity)
 		return
 	}
 	passportNumber := parts[1]
 	if err := validator.ValidateDigits(passportNumber, 6); err != nil {
-		logger.SugaredLogger().Errorw("Ошибка валидации", "error", err)
+		logger.SugaredLogger().Debug(err)
 		w.WriteHeader(http.StatusUnprocessableEntity)
 		return
 	}
 
 	userData := models.UserData{
-		PassportNumber: passportNumber,
-		PassportSeries: passportSeries,
+		PassportNumber: req.PassportNumber,
 		Surname:        validator.GenerateRandomString(7),
 		Name:           validator.GenerateRandomString(5),
 		Patronymic:     validator.GenerateRandomString(8),
 		Address:        validator.GenerateRandomString(15),
 	}
 
-	user_id, err := useCase.UseCaseCreate(userData)
+	userID, err := useCase.UseCaseCreate(userData)
 	if err != nil {
-		logger.SugaredLogger().Errorw("Ошибка записи в БД", "error", err)
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) {
+			if pgErr.Code == "23505" {
+				logger.SugaredLogger().Debug(err)
+				w.WriteHeader(http.StatusConflict)
+				return
+			}
+		}
+		logger.SugaredLogger().Debug(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Ошибка записи в БД"))
+		return
+	}
+
+	response := map[string]int{"UserID": userID}
+	res, err := json.Marshal(response)
+	if err != nil {
+		logger.SugaredLogger().Debug(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	response := map[string]int{"UserID": user_id}
-
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	err = json.NewEncoder(w).Encode(response)
-	if err != nil {
-		// В случае ошибки кодируем JSON, лучше обработать её
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	w.Write(res)
 }
 
 // @Summary Удаление пользователя по ID
@@ -204,6 +227,7 @@ func HandlerCreat(w http.ResponseWriter, r *http.Request, useCase usecase.UseCas
 // @Produce json
 // @Param userID path int true "User ID" Format(int)
 // @Success 200 {string} string "Пользователь успешно удален"
+// @Failure 404 {string} string "Пользователь не найден"
 // @Failure 422 {string} string "Ошибка конвертирования ID"
 // @Failure 500 {string} string "Ошибка сервера"
 // @Router /delUser/{userID} [delete]
@@ -214,23 +238,26 @@ func HandlerDelete(w http.ResponseWriter, r *http.Request, useCase usecase.UseCa
 	}
 
 	userIDStr := chi.URLParam(r, "userID")
-	log.Println("userIDstr", userIDStr)
 
 	userID, err := strconv.Atoi(userIDStr)
 	if err != nil {
-		logger.SugaredLogger().Error("Ошибка конвертирования ID")
+		logger.SugaredLogger().Debug(err)
 		w.WriteHeader(http.StatusUnprocessableEntity)
 		return
 	}
 
 	err = useCase.UseCaseDelete(userID)
 	if err != nil {
-		logger.SugaredLogger().Errorw("Ошибка удаления записи", "error", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		if strings.Contains(err.Error(), "не найден") {
+			logger.SugaredLogger().Debug(err)
+			w.WriteHeader(http.StatusNotFound)
+		} else {
+			logger.SugaredLogger().Debug(err)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -242,6 +269,9 @@ func HandlerDelete(w http.ResponseWriter, r *http.Request, useCase usecase.UseCa
 // @Param userID path int true "User ID" Format(int64)
 // @Param body body models.UserData true "Данные пользователя (неменяемые поля оставляем пустыми)"
 // @Success 200 {string} string "Данные пользователя успешно обновлены"
+// @Failure 400 {string} string "Ошибка декодирования тела запроса"
+// @Failure 404 {string} string "Пользователь не найден"
+// @Failure 409 {string} string "Ошибка записи: Пользователь с таким номером паспорта уже существует"
 // @Failure 422 {string} string "Ошибка конвертирования ID"
 // @Failure 500 {string} string "Ошибка сервера"
 // @Router /updUser/{userID} [put]
@@ -255,7 +285,7 @@ func HandlerUpdate(w http.ResponseWriter, r *http.Request, useCase usecase.UseCa
 
 	userID, err := strconv.Atoi(userIDstr)
 	if err != nil {
-		logger.SugaredLogger().Error("Ошибка конвертирования ID")
+		logger.SugaredLogger().Debug(err)
 		w.WriteHeader(http.StatusUnprocessableEntity)
 		return
 	}
@@ -265,22 +295,21 @@ func HandlerUpdate(w http.ResponseWriter, r *http.Request, useCase usecase.UseCa
 	dec.DisallowUnknownFields()
 
 	if err := dec.Decode(&req); err != nil {
-		logger.SugaredLogger().Errorw("Ошибка декодирования JSON", "error", err)
+		logger.SugaredLogger().Debug(err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	defer r.Body.Close()
 
-	if len(req.PassportSeries) > 0 {
-		if err := validator.ValidateDigits(req.PassportSeries, 4); err != nil {
-			logger.SugaredLogger().Errorw("Ошибка валидации серии поспорта", "error", err)
+	if len(req.PassportNumber) > 0 {
+		parts := strings.Split(req.PassportNumber, " ")
+		if err := validator.ValidateDigits(parts[0], 4); err != nil {
+			logger.SugaredLogger().Debug(err)
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-	}
-	if len(req.PassportNumber) > 0 {
-		if err := validator.ValidateDigits(req.PassportNumber, 6); err != nil {
-			logger.SugaredLogger().Errorw("Ошибка валидации номера паспорта", "error", err)
+		if err := validator.ValidateDigits(parts[1], 6); err != nil {
+			logger.SugaredLogger().Debug(err)
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
@@ -288,12 +317,24 @@ func HandlerUpdate(w http.ResponseWriter, r *http.Request, useCase usecase.UseCa
 
 	err = useCase.UseCaseUpdate(userID, req)
 	if err != nil {
-		logger.SugaredLogger().Errorw("Ошибка обновления записи", "error", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) {
+			if pgErr.Code == "23505" {
+				logger.SugaredLogger().Debug("Ошибка:", err)
+				w.WriteHeader(http.StatusConflict)
+				return
+			}
+		}
+		if strings.Contains(err.Error(), "не найден") {
+			logger.SugaredLogger().Debug(err)
+			w.WriteHeader(http.StatusNotFound)
+		} else {
+			logger.SugaredLogger().Debug(err)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -304,6 +345,7 @@ func HandlerUpdate(w http.ResponseWriter, r *http.Request, useCase usecase.UseCa
 // @Produce json
 // @Param userID path int true "User ID"
 // @Success 200 {object} models.UserData "Успешный ответ с данными пользователя"
+// @Failure 404 {string} string "Пользователь не найден"
 // @Failure 422 {string} string "Ошибка конвертирования ID"
 // @Failure 500 {string} string "Ошибка сервера"
 // @Router /getUser/{userID} [get]
@@ -317,26 +359,33 @@ func HandlerGetUser(w http.ResponseWriter, r *http.Request, useCase usecase.UseC
 
 	userID, err := strconv.Atoi(userIDStr)
 	if err != nil {
-		logger.SugaredLogger().Error("Ошибка конвертирования ID")
+		logger.SugaredLogger().Debug(err)
 		w.WriteHeader(http.StatusUnprocessableEntity)
 		return
 	}
 
 	userData, err := useCase.UseCaseRead(userID)
 	if err != nil {
-		logger.SugaredLogger().Errorw("Ошибка чтения записи", "error", err)
+		if strings.Contains(err.Error(), "не найден") {
+			logger.SugaredLogger().Debug(err)
+			w.WriteHeader(http.StatusNotFound)
+		} else {
+			logger.SugaredLogger().Debug(err)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		return
+	}
+
+	response, err := json.Marshal(userData)
+	if err != nil {
+		logger.SugaredLogger().Debug(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-
-	if err := json.NewEncoder(w).Encode(userData); err != nil {
-		logger.SugaredLogger().Errorw("Ошибка кодирования JSON", "error", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
+	w.Write(response)
 }
 
 // @Summary Получение списка пользователей
@@ -358,21 +407,14 @@ func HandlerGetUsers(w http.ResponseWriter, r *http.Request, useCase usecase.Use
 
 	var req models.UserData
 	dec := json.NewDecoder(r.Body)
-	dec.DisallowUnknownFields() // Запрещаем декодировать неизвестные поля
+	dec.DisallowUnknownFields()
 
-	// Попытка декодировать JSON в структуру UserData
 	if err := dec.Decode(&req); err != nil {
-		logger.SugaredLogger().Errorw("Ошибка декодирования JSON", "error", err)
+		logger.SugaredLogger().Debug(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	/*
-		if err := dec.Decode(&req); err != nil {
-			logger.SugaredLogger().Errorw("Ошибка декодирования", "error", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-	*/
+
 	defer r.Body.Close()
 
 	// Получаем параметры пагинации из URL
@@ -398,21 +440,22 @@ func HandlerGetUsers(w http.ResponseWriter, r *http.Request, useCase usecase.Use
 	// Используем параметры фильтрации и пагинации в запросе к базе данных
 	users, err := useCase.UseCaseGetUsers(req, page, limit)
 	if err != nil {
-		logger.SugaredLogger().Errorw("Ошибка получения данных пользователей", "error", err)
+		logger.SugaredLogger().Debug(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	// Устанавливаем заголовок ответа
+	res, err := json.Marshal(users)
+	if err != nil {
+		logger.SugaredLogger().Debug(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
+	w.Write(res)
 
-	// Кодируем и записываем ответ в JSON
-	if err := json.NewEncoder(w).Encode(users); err != nil {
-		logger.SugaredLogger().Errorw("Ошибка кодирования JSON", "error", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
 }
 
 // @Summary Добавление новой задачи
@@ -423,6 +466,7 @@ func HandlerGetUsers(w http.ResponseWriter, r *http.Request, useCase usecase.Use
 // @Param userID path int true "ID пользователя"
 // @Param body body models.TaskName true "Название задачи"
 // @Success 200 {string} string "TaskID: {taskID}"
+// @Failure 404 {string} string "Пользователь не найден"
 // @Failure 422 {string} string "Ошибка конвертирования UserID"
 // @Failure 500 {string} string "Ошибка сервера"
 // @Router /addTask/{userID} [post]
@@ -435,7 +479,7 @@ func HandlerAddTask(w http.ResponseWriter, r *http.Request, useCase usecase.UseC
 	userIDstr := chi.URLParam(r, "userID")
 	userID, err := strconv.Atoi(userIDstr)
 	if err != nil {
-		logger.SugaredLogger().Errorw("Ошибка UserID", "error", err)
+		logger.SugaredLogger().Debug(err)
 		w.WriteHeader(http.StatusUnprocessableEntity)
 		return
 	}
@@ -443,11 +487,11 @@ func HandlerAddTask(w http.ResponseWriter, r *http.Request, useCase usecase.UseC
 	var taskName models.TaskName
 
 	dec := json.NewDecoder(r.Body)
-	dec.DisallowUnknownFields() // Запрещаем декодировать неизвестные поля
+	dec.DisallowUnknownFields()
 
 	// Попытка декодировать JSON в структуру UserData
 	if err := dec.Decode(&taskName); err != nil {
-		logger.SugaredLogger().Errorw("Ошибка декодирования JSON", "error", err)
+		logger.SugaredLogger().Debug(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -455,22 +499,30 @@ func HandlerAddTask(w http.ResponseWriter, r *http.Request, useCase usecase.UseC
 	defer r.Body.Close()
 
 	taskID, err := useCase.UseCaseCreateTask(userID, taskName.Name)
+
 	if err != nil {
-		logger.SugaredLogger().Errorw("Ошибка записи в БД", "error", err)
-		w.WriteHeader(http.StatusInternalServerError)
+
+		if strings.Contains(err.Error(), "не найден") {
+			logger.SugaredLogger().Debug(err)
+			w.WriteHeader(http.StatusNotFound)
+		} else {
+			logger.SugaredLogger().Debug(err)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
 		return
 	}
 
 	response := map[string]int{"TaskID": taskID}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	err = json.NewEncoder(w).Encode(response)
+	res, err := json.Marshal(response)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		logger.SugaredLogger().Debug(err)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(res)
 }
 
 // @Summary Начать отсчет времени по задаче для пользователя
@@ -480,6 +532,8 @@ func HandlerAddTask(w http.ResponseWriter, r *http.Request, useCase usecase.UseC
 // @Produce json
 // @Param taskID path int true "ID задачи"
 // @Success 200 {string} string "TaskID: {taskID}"
+// @Failure 404 {string} string "Задача не найдена"
+// @Failure 409 {string} string "Время начала уже установлено"
 // @Failure 422 {string} string "Ошибка Task ID"
 // @Failure 500 {string} string "Ошибка сервера"
 // @Router /addTask/startTime/{taskID} [put]
@@ -492,27 +546,27 @@ func HandlerStartTime(w http.ResponseWriter, r *http.Request, useCase usecase.Us
 	taskIDStr := chi.URLParam(r, "taskID")
 	taskID, err := strconv.Atoi(taskIDStr)
 	if err != nil {
-		logger.SugaredLogger().Errorw("Ошибка Task ID", "error", err)
+		logger.SugaredLogger().Debug(err)
 		w.WriteHeader(http.StatusUnprocessableEntity)
 		return
 	}
 
 	err = useCase.UseCaseAddStartTime(taskID)
 	if err != nil {
-		logger.SugaredLogger().Errorw("Ошибка записи в БД", "error", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		if strings.Contains(err.Error(), "не найдена") {
+			logger.SugaredLogger().Debug(err)
+			w.WriteHeader(http.StatusNotFound)
+		} else if strings.Contains(err.Error(), "уже заполнено") {
+			logger.SugaredLogger().Debug(err)
+			w.WriteHeader(http.StatusConflict)
+		} else {
+			logger.SugaredLogger().Debug(err)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
 		return
 	}
 
-	response := map[string]int{"TaskID": taskID}
-
-	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	err = json.NewEncoder(w).Encode(response)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
 }
 
 // @Summary Закончить отсчет времени по задаче для пользователя
@@ -522,7 +576,10 @@ func HandlerStartTime(w http.ResponseWriter, r *http.Request, useCase usecase.Us
 // @Produce json
 // @Param taskID path int true "ID задачи"
 // @Success 200 {string} string "TaskID: {taskID}"
+// @Failure 404 {string} string "Задача не найдена"
+// @Failure 409 {string} string "Время старта уже задано"
 // @Failure 422 {string} string "Ошибка Task ID"
+// @Failure 428 {string} string "Не заполнено поле StartTime"
 // @Failure 500 {string} string "Ошибка сервера"
 // @Router /addTask/endTime/{taskID} [put]
 func HandlerEndTime(w http.ResponseWriter, r *http.Request, useCase usecase.UseCaseStorage) {
@@ -534,28 +591,30 @@ func HandlerEndTime(w http.ResponseWriter, r *http.Request, useCase usecase.UseC
 	taskIDStr := chi.URLParam(r, "taskID")
 	taskID, err := strconv.Atoi(taskIDStr)
 	if err != nil {
-		logger.SugaredLogger().Errorw("Ошибка Task ID", "error", err)
+		logger.SugaredLogger().Debug(err)
 		w.WriteHeader(http.StatusUnprocessableEntity)
 		return
 	}
 
 	err = useCase.UseCaseAddEndTime(taskID)
 	if err != nil {
-		logger.SugaredLogger().Errorw("Ошибка записи в БД", "error", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		if strings.Contains(err.Error(), "не найдена") {
+			logger.SugaredLogger().Debug(err)
+			w.WriteHeader(http.StatusNotFound)
+		} else if strings.Contains(err.Error(), "уже заполнено") {
+			logger.SugaredLogger().Debug(err)
+			w.WriteHeader(http.StatusConflict)
+		} else if strings.Contains(err.Error(), "не заполнено") {
+			logger.SugaredLogger().Debug(err)
+			w.WriteHeader(http.StatusPreconditionRequired)
+		} else {
+			logger.SugaredLogger().Debug(err)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
 		return
 	}
 
-	response := map[string]int{"TaskID": taskID}
-
-	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	err = json.NewEncoder(w).Encode(response)
-	if err != nil {
-		// В случае ошибки кодируем JSON, лучше обработать её
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
 }
 
 // @Summary Получение задач пользователя
@@ -566,6 +625,7 @@ func HandlerEndTime(w http.ResponseWriter, r *http.Request, useCase usecase.UseC
 // @Param userID path int true "ID пользователя"
 // @Param body body models.TaskTime true "Фильтрация по периоду времени: start - начало периода, end - конец периода. Начало и конец прописывать в формате ДД.ММ.ГГГГ"
 // @Success 200 {array} models.Tasks "Список задач пользователя"
+// @Failure 404 {string} string "Данные не найдены"
 // @Failure 422 {string} string "Неправильный ID пользователя"
 // @Failure 500 {string} string "Ошибка сервера"
 // @Router /getTasks/{userID} [post]
@@ -579,18 +639,17 @@ func HandlerGetTasks(w http.ResponseWriter, r *http.Request, useCase usecase.Use
 
 	userID, err := strconv.Atoi(userIDstr)
 	if err != nil {
-		logger.SugaredLogger().Error("Ошибка конвертирования ID")
+		logger.SugaredLogger().Debug(err)
 		w.WriteHeader(http.StatusUnprocessableEntity)
 		return
 	}
 
 	var period models.TaskTime
 	dec := json.NewDecoder(r.Body)
-	dec.DisallowUnknownFields() // Запрещаем декодировать неизвестные поля
+	dec.DisallowUnknownFields()
 
-	// Попытка декодировать JSON в структуру UserData
 	if err := dec.Decode(&period); err != nil {
-		logger.SugaredLogger().Errorw("Ошибка декодирования JSON", "error", err)
+		logger.SugaredLogger().Debug(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -606,13 +665,13 @@ func HandlerGetTasks(w http.ResponseWriter, r *http.Request, useCase usecase.Use
 	// Преобразуем строки Start и End в тип time.Time
 	sTime, err := time.Parse("02.01.2006", period.Start)
 	if err != nil {
-		logger.SugaredLogger().Errorw("Ошибка преобразования времени", "error", err)
+		logger.SugaredLogger().Debug(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	eTime, err := time.Parse("02.01.2006", period.End)
 	if err != nil {
-		logger.SugaredLogger().Errorw("Ошибка преобразования времени", "error", err)
+		logger.SugaredLogger().Debug(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -620,18 +679,22 @@ func HandlerGetTasks(w http.ResponseWriter, r *http.Request, useCase usecase.Use
 	period.End = eTime.Format("2006-01-02 15:04:05")
 
 	userData, err := useCase.UseCaseGetTasksUser(userID, period)
+
 	if err != nil {
-		logger.SugaredLogger().Errorw("Ошибка чтения", "error", err)
+		logger.SugaredLogger().Debug(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	res, err := json.Marshal(userData)
+	if err != nil {
+		logger.SugaredLogger().Debug(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
+	w.Write(res)
 
-	if err := json.NewEncoder(w).Encode(userData); err != nil {
-		logger.SugaredLogger().Errorw("Ошибка кодирования JSON", "error", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
 }

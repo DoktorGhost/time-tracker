@@ -7,8 +7,10 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	_ "github.com/jackc/pgconn"
+	_ "github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	_ "github.com/jackc/pgx/v5/stdlib"
-	_ "github.com/lib/pq"
 	"strconv"
 	"sync"
 	"time-tracker/internal/config"
@@ -59,20 +61,20 @@ func NewPostgresStorage(conf *config.Config) (*PostgresStorage, error) {
 		return nil, err
 	}
 
-	//sugar.Infow("Миграции успешно применены")
-
 	return &PostgresStorage{db: db}, nil
 }
 
 func (p *PostgresStorage) Create(userData models.UserData) (int, error) {
 	query := `
-INSERT INTO users (passport_series, passport_number, surname, name, patronymic, address)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO users (passport_number, surname, name, patronymic, address)
+VALUES ($1, $2, $3, $4, $5)
 RETURNING id;
 `
 	var userID int
-	err := p.db.QueryRow(query, userData.PassportSeries, userData.PassportNumber, userData.Surname, userData.Name, userData.Patronymic, userData.Address).Scan(&userID)
+	err := p.db.QueryRow(query, userData.PassportNumber, userData.Surname, userData.Name, userData.Patronymic, userData.Address).Scan(&userID)
 	if err != nil {
+		var pgErr *pgconn.PgError
+		errors.As(err, &pgErr)
 		return 0, err
 	}
 	return userID, nil
@@ -80,13 +82,12 @@ RETURNING id;
 
 func (p *PostgresStorage) Read(userID int) (models.UserData, error) {
 	query := `
-		SELECT id, passport_series, passport_number, surname, name, patronymic, address FROM users WHERE id = $1;
+		SELECT id, passport_number, surname, name, patronymic, address FROM users WHERE id = $1;
 	`
 
 	data := models.UserData{}
 	err := p.db.QueryRow(query, userID).Scan(
 		&data.UserID,
-		&data.PassportSeries,
 		&data.PassportNumber,
 		&data.Surname,
 		&data.Name,
@@ -94,6 +95,9 @@ func (p *PostgresStorage) Read(userID int) (models.UserData, error) {
 		&data.Address,
 	)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return models.UserData{}, fmt.Errorf("пользователь с id %d не найден", userID)
+		}
 		return models.UserData{}, err
 	}
 
@@ -107,14 +111,11 @@ func (p *PostgresStorage) Update(userID int, userData models.UserData) error {
 	}
 	query := `
 		UPDATE users
-		SET passport_number = $2, passport_series = $3, surname = $4, name = $5, patronymic = $6, address = $7
+		SET passport_number = $2, surname = $3, name = $4, patronymic = $5, address = $6
 		WHERE id = $1
 	`
 	if userData.PassportNumber != "" {
 		data.PassportNumber = userData.PassportNumber
-	}
-	if userData.PassportSeries != "" {
-		data.PassportSeries = userData.PassportSeries
 	}
 	if userData.Surname != "" {
 		data.Surname = userData.Surname
@@ -132,7 +133,6 @@ func (p *PostgresStorage) Update(userID int, userData models.UserData) error {
 	_, err = p.db.Exec(query,
 		userID,
 		data.PassportNumber,
-		data.PassportSeries,
 		data.Surname,
 		data.Name,
 		data.Patronymic,
@@ -147,9 +147,18 @@ func (p *PostgresStorage) Update(userID int, userData models.UserData) error {
 
 func (p *PostgresStorage) Delete(userID int) error {
 	query := `DELETE FROM users WHERE id = $1;`
-	_, err := p.db.Exec(query, userID)
+	result, err := p.db.Exec(query, userID)
 	if err != nil {
 		return fmt.Errorf("ошибка удаления записи: %v", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("пользователь с id %d не найден", userID)
 	}
 	return nil
 }
@@ -161,11 +170,6 @@ func (p *PostgresStorage) GetUsers(dataFilter models.UserData, page, limit int) 
 	if dataFilter.UserID != "" {
 		query += " AND id = $" + strconv.Itoa(argCounter)
 		args = append(args, dataFilter.UserID)
-		argCounter++
-	}
-	if dataFilter.PassportSeries != "" {
-		query += " AND passport_series = $" + strconv.Itoa(argCounter)
-		args = append(args, dataFilter.PassportSeries)
 		argCounter++
 	}
 	if dataFilter.PassportNumber != "" {
@@ -208,7 +212,7 @@ func (p *PostgresStorage) GetUsers(dataFilter models.UserData, page, limit int) 
 	users := []models.UserData{}
 	for rows.Next() {
 		var user models.UserData
-		if err := rows.Scan(&user.UserID, &user.PassportSeries, &user.PassportNumber, &user.Surname, &user.Name, &user.Patronymic, &user.Address); err != nil {
+		if err := rows.Scan(&user.UserID, &user.PassportNumber, &user.Surname, &user.Name, &user.Patronymic, &user.Address); err != nil {
 			return nil, err
 		}
 		users = append(users, user)
@@ -235,6 +239,8 @@ RETURNING id;
 	var taskID int
 	err = p.db.QueryRow(query, userID, nameTask).Scan(&taskID)
 	if err != nil {
+		var pgErr *pgconn.PgError
+		errors.As(err, &pgErr)
 		return 0, err
 	}
 	return taskID, nil
@@ -255,6 +261,9 @@ func (p *PostgresStorage) ReadTask(taskID int) (models.TaskData, error) {
 		&data.AllTime,
 	)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return models.TaskData{}, fmt.Errorf("задача с id %d не найдена", taskID)
+		}
 		return models.TaskData{}, err
 	}
 
@@ -262,44 +271,57 @@ func (p *PostgresStorage) ReadTask(taskID int) (models.TaskData, error) {
 }
 
 func (p *PostgresStorage) AddStartTime(taskID int) error {
-	_, err := p.ReadTask(taskID)
+	// Проверяем, что задача существует и получаем её данные
+	task, err := p.ReadTask(taskID)
 	if err != nil {
 		return err
 	}
 
-	query := `
-UPDATE tasks
-SET start_time = NOW()
-WHERE id = $1;
-`
-	_, err = p.db.Exec(query, taskID)
+	// Проверяем, что поле start_time равно NULL
+	if !task.StartTime.Valid { // Проверяем, что start_time является NULL
+		query := `
+		UPDATE tasks
+		SET start_time = NOW()
+		WHERE id = $1 AND start_time IS NULL; -- Обновляем только если start_time равно NULL
+		`
+		_, err = p.db.Exec(query, taskID)
 
-	if err != nil {
-		return err
+		if err != nil {
+			return err
+		}
+	} else {
+		return fmt.Errorf("поле start_time уже заполнено")
 	}
+
 	return nil
 }
 
 func (p *PostgresStorage) AddEndTime(taskID int) error {
-	dataTask, err := p.ReadTask(taskID)
+	task, err := p.ReadTask(taskID)
 	if err != nil {
+
 		return err
 	}
-	if !dataTask.StartTime.Valid {
-		return errors.New("Start time is NULL")
+	if task.StartTime.Valid {
+		if !task.EndTime.Valid {
+			query := `
+				UPDATE tasks
+				SET end_time = NOW(),
+    				all_time = EXTRACT(EPOCH FROM NOW() - start_time)
+				WHERE id = $1;
+				`
+			_, err = p.db.Exec(query, taskID)
+
+			if err != nil {
+				return err
+			}
+		} else {
+			return fmt.Errorf("поле end_time уже заполнено")
+		}
+	} else {
+		return fmt.Errorf("поле start_time не заполнено")
 	}
 
-	query := `
-UPDATE tasks
-SET end_time = NOW(),
-    all_time = EXTRACT(EPOCH FROM NOW() - start_time)
-WHERE id = $1;
-`
-	_, err = p.db.Exec(query, taskID)
-
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
