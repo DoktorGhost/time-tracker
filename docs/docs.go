@@ -27,7 +27,7 @@ const docTemplate = `{
                 "tags": [
                     "Tasks"
                 ],
-                "summary": "Установка времени окончания задачи",
+                "summary": "Закончить отсчет времени по задаче для пользователя",
                 "parameters": [
                     {
                         "type": "integer",
@@ -40,6 +40,12 @@ const docTemplate = `{
                 "responses": {
                     "200": {
                         "description": "TaskID: {taskID}",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "422": {
+                        "description": "Ошибка Task ID",
                         "schema": {
                             "type": "string"
                         }
@@ -65,7 +71,7 @@ const docTemplate = `{
                 "tags": [
                     "Tasks"
                 ],
-                "summary": "Установка времени начала задачи",
+                "summary": "Начать отсчет времени по задаче для пользователя",
                 "parameters": [
                     {
                         "type": "integer",
@@ -78,6 +84,12 @@ const docTemplate = `{
                 "responses": {
                     "200": {
                         "description": "TaskID: {taskID}",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "422": {
+                        "description": "Ошибка Task ID",
                         "schema": {
                             "type": "string"
                         }
@@ -146,7 +158,7 @@ const docTemplate = `{
         },
         "/addUser": {
             "post": {
-                "description": "Добавляет нового пользователя на основе серии и номера паспорта, обогащает информацию через внешний API",
+                "description": "Добавляет нового пользователя на основе серии и номера паспорта, обогащает информацию через внешний API (если в .env не указан URL API - получим ответ 500)",
                 "consumes": [
                     "application/json"
                 ],
@@ -226,14 +238,8 @@ const docTemplate = `{
                             "type": "string"
                         }
                     },
-                    "400": {
-                        "description": "Пустой ID",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
                     "422": {
-                        "description": "Ошибка конвертирования",
+                        "description": "Ошибка конвертирования ID",
                         "schema": {
                             "type": "string"
                         }
@@ -269,7 +275,7 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "Период времени",
+                        "description": "Фильтрация по периоду времени: start - начало периода, end - конец периода. Начало и конец прописывать в формате ДД.ММ.ГГГГ",
                         "name": "body",
                         "in": "body",
                         "required": true,
@@ -288,8 +294,8 @@ const docTemplate = `{
                             }
                         }
                     },
-                    "400": {
-                        "description": "Не указан ID пользователя или неверный формат параметров периода времени",
+                    "422": {
+                        "description": "Неправильный ID пользователя",
                         "schema": {
                             "type": "string"
                         }
@@ -330,12 +336,6 @@ const docTemplate = `{
                         "description": "Успешный ответ с данными пользователя",
                         "schema": {
                             "$ref": "#/definitions/models.UserData"
-                        }
-                    },
-                    "400": {
-                        "description": "Не указан ID пользователя или ID не является числом",
-                        "schema": {
-                            "type": "string"
                         }
                     },
                     "422": {
@@ -382,7 +382,7 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "Фильтр пользователей",
+                        "description": "Фильтр пользователей (выбираем по каким полям будет фильтрация, вписываем туда ключ фильтра. Ненужные делаем пусытими или удаляем)",
                         "name": "body",
                         "in": "body",
                         "schema": {
@@ -436,12 +436,6 @@ const docTemplate = `{
                 "responses": {
                     "200": {
                         "description": "UserID",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "400": {
-                        "description": "Ошибка декодирования тела запроса",
                         "schema": {
                             "type": "string"
                         }
@@ -501,7 +495,7 @@ const docTemplate = `{
                         }
                     },
                     "422": {
-                        "description": "Ошибка валидации серии или номера паспорта",
+                        "description": "Ошибка конвертирования ID",
                         "schema": {
                             "type": "string"
                         }
@@ -520,7 +514,7 @@ const docTemplate = `{
         "models.PassportRequest": {
             "type": "object",
             "properties": {
-                "passport_number": {
+                "passportNumber": {
                     "type": "string"
                 }
             }
