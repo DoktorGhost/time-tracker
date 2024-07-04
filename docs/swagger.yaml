@@ -44,7 +44,7 @@ info:
   title: Тайм-Трекер API
   version: "1.0"
 paths:
-  /addTask/{userID}:
+  /task/{userID}:
     post:
       consumes:
       - application/json
@@ -83,7 +83,7 @@ paths:
       summary: Добавление новой задачи
       tags:
       - Tasks
-  /addTask/endTime/{taskID}:
+  /task/end/{taskID}:
     put:
       consumes:
       - application/json
@@ -124,7 +124,7 @@ paths:
       summary: Закончить отсчет времени по задаче для пользователя
       tags:
       - Tasks
-  /addTask/startTime/{taskID}:
+  /task/start/{taskID}:
     put:
       consumes:
       - application/json
@@ -161,7 +161,89 @@ paths:
       summary: Начать отсчет времени по задаче для пользователя
       tags:
       - Tasks
-  /addUser:
+  /tasks/{userID}:
+    post:
+      consumes:
+      - application/json
+      description: Возвращает список задач пользователя за указанный период времени.
+      parameters:
+      - description: ID пользователя
+        in: path
+        name: userID
+        required: true
+        type: integer
+      - description: 'Фильтрация по периоду времени: start - начало периода, end -
+          конец периода. Начало и конец прописывать в формате ДД.ММ.ГГГГ'
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.TaskTime'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Список задач пользователя
+          schema:
+            items:
+              $ref: '#/definitions/models.Tasks'
+            type: array
+        "404":
+          description: Данные не найдены
+          schema:
+            type: string
+        "422":
+          description: Неправильный ID пользователя
+          schema:
+            type: string
+        "500":
+          description: Ошибка сервера
+          schema:
+            type: string
+      summary: Получение задач пользователя
+      tags:
+      - Tasks
+  /test:
+    post:
+      consumes:
+      - application/json
+      description: Добавляет нового пользователя на основе серии и номера паспорта,
+        остальная информация берется рандомно, для тестирования и отладки запросов
+      parameters:
+      - description: Серия и номер пасспорта в формате `1234 123456` (4 цифры, пробел,
+          6 цифр)
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.PassportRequest'
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: UserID
+          schema:
+            type: string
+        "400":
+          description: Ошибка декодирования тела запроса
+          schema:
+            type: string
+        "409":
+          description: 'Ошибка записи: Пользователь с таким номером паспорта уже существует'
+          schema:
+            type: string
+        "422":
+          description: Ошибка валидации серии паспорта или номера паспорта
+          schema:
+            type: string
+        "500":
+          description: Ошибка сервера
+          schema:
+            type: string
+      summary: 'Тестовый хендлер: добавление пользователя в обход стороннего API'
+      tags:
+      - Users
+  /user:
     post:
       consumes:
       - application/json
@@ -206,7 +288,7 @@ paths:
       summary: Добавление нового пользователя
       tags:
       - Users
-  /delUser/{userID}:
+  /user/{userID}:
     delete:
       consumes:
       - application/json
@@ -240,49 +322,6 @@ paths:
       summary: Удаление пользователя по ID
       tags:
       - Users
-  /getTasks/{userID}:
-    post:
-      consumes:
-      - application/json
-      description: Возвращает список задач пользователя за указанный период времени.
-      parameters:
-      - description: ID пользователя
-        in: path
-        name: userID
-        required: true
-        type: integer
-      - description: 'Фильтрация по периоду времени: start - начало периода, end -
-          конец периода. Начало и конец прописывать в формате ДД.ММ.ГГГГ'
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/models.TaskTime'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: Список задач пользователя
-          schema:
-            items:
-              $ref: '#/definitions/models.Tasks'
-            type: array
-        "404":
-          description: Данные не найдены
-          schema:
-            type: string
-        "422":
-          description: Неправильный ID пользователя
-          schema:
-            type: string
-        "500":
-          description: Ошибка сервера
-          schema:
-            type: string
-      summary: Получение задач пользователя
-      tags:
-      - Tasks
-  /getUser/{userID}:
     get:
       consumes:
       - application/json
@@ -315,86 +354,7 @@ paths:
       summary: Получение информации о пользователе
       tags:
       - Users
-  /getUsers/{page}/{limit}:
-    post:
-      consumes:
-      - application/json
-      description: Возвращает список пользователей с возможностью фильтрации и пагинации.
-      parameters:
-      - description: Номер страницы
-        in: path
-        name: page
-        required: true
-        type: integer
-      - description: Количество элементов на странице
-        in: path
-        name: limit
-        required: true
-        type: integer
-      - description: Фильтр пользователей (выбираем по каким полям будет фильтрация,
-          вписываем туда ключ фильтра. Ненужные делаем пусытими или удаляем)
-        in: body
-        name: body
-        schema:
-          $ref: '#/definitions/models.UserData'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: Успешный ответ с данными пользователей
-          schema:
-            items:
-              $ref: '#/definitions/models.UserData'
-            type: array
-        "500":
-          description: Ошибка сервера
-          schema:
-            type: string
-      summary: Получение списка пользователей
-      tags:
-      - Users
-  /testAdd:
-    post:
-      consumes:
-      - application/json
-      description: Добавляет нового пользователя на основе серии и номера паспорта,
-        остальная информация берется рандомно, для тестирования и отладки запросов
-      parameters:
-      - description: Серия и номер пасспорта в формате `1234 123456` (4 цифры, пробел,
-          6 цифр)
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/models.PassportRequest'
-      produces:
-      - text/plain
-      responses:
-        "200":
-          description: UserID
-          schema:
-            type: string
-        "400":
-          description: Ошибка декодирования тела запроса
-          schema:
-            type: string
-        "409":
-          description: 'Ошибка записи: Пользователь с таким номером паспорта уже существует'
-          schema:
-            type: string
-        "422":
-          description: Ошибка валидации серии паспорта или номера паспорта
-          schema:
-            type: string
-        "500":
-          description: Ошибка сервера
-          schema:
-            type: string
-      summary: 'Тестовый хендлер: добавление пользователя в обход стороннего API'
-      tags:
-      - Users
-  /updUser/{userID}:
-    put:
+    patch:
       consumes:
       - application/json
       description: Обновляет данные пользователя по его идентификатору.
@@ -439,6 +399,44 @@ paths:
           schema:
             type: string
       summary: Обновление данных пользователя
+      tags:
+      - Users
+  /users/{page}/{limit}:
+    post:
+      consumes:
+      - application/json
+      description: Возвращает список пользователей с возможностью фильтрации и пагинации.
+      parameters:
+      - description: Номер страницы
+        in: path
+        name: page
+        required: true
+        type: integer
+      - description: Количество элементов на странице
+        in: path
+        name: limit
+        required: true
+        type: integer
+      - description: Фильтр пользователей (выбираем по каким полям будет фильтрация,
+          вписываем туда ключ фильтра. Ненужные делаем пусытими или удаляем)
+        in: body
+        name: body
+        schema:
+          $ref: '#/definitions/models.UserData'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешный ответ с данными пользователей
+          schema:
+            items:
+              $ref: '#/definitions/models.UserData'
+            type: array
+        "500":
+          description: Ошибка сервера
+          schema:
+            type: string
+      summary: Получение списка пользователей
       tags:
       - Users
 swagger: "2.0"

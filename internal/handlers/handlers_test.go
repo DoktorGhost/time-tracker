@@ -79,7 +79,7 @@ func TestHandlerAddUser(t *testing.T) {
 		{
 			name:   "#1 Успешный запрос",
 			method: http.MethodPost,
-			url:    "/addUser",
+			url:    "/user",
 			body:   args{bytes.NewBufferString(`{"passportNumber": "1234 567890"}`)},
 			mockCreate: func() {
 				mockUseCase.EXPECT().UseCaseCreate(gomock.Any()).Return(1, nil)
@@ -89,7 +89,7 @@ func TestHandlerAddUser(t *testing.T) {
 		{
 			name:       "#2 Неверный метод запроса",
 			method:     http.MethodGet,
-			url:        "/addUser",
+			url:        "/user",
 			body:       args{bytes.NewBufferString(`{"passportNumber": "1234 567890"}`)},
 			mockCreate: func() {},
 			wantStatus: http.StatusMethodNotAllowed,
@@ -97,7 +97,7 @@ func TestHandlerAddUser(t *testing.T) {
 		{
 			name:       "#3 Ошибка в теле запроса",
 			method:     http.MethodPost,
-			url:        "/addUser",
+			url:        "/user",
 			body:       args{bytes.NewBufferString(`{"passportNumber": "1214 567890}`)},
 			mockCreate: func() {},
 			wantStatus: http.StatusBadRequest,
@@ -105,7 +105,7 @@ func TestHandlerAddUser(t *testing.T) {
 		{
 			name:       "#4 Ошибка валидации данных (серия)",
 			method:     http.MethodPost,
-			url:        "/addUser",
+			url:        "/user",
 			body:       args{bytes.NewBufferString(`{"passportNumber": "12в4 567890"}`)},
 			mockCreate: func() {},
 			wantStatus: http.StatusUnprocessableEntity,
@@ -113,7 +113,7 @@ func TestHandlerAddUser(t *testing.T) {
 		{
 			name:       "#5 Ошибка валидации данных (номер)",
 			method:     http.MethodPost,
-			url:        "/addUser",
+			url:        "/user",
 			body:       args{bytes.NewBufferString(`{"passportNumber": "1214 56в890"}`)},
 			mockCreate: func() {},
 			wantStatus: http.StatusUnprocessableEntity,
@@ -121,7 +121,7 @@ func TestHandlerAddUser(t *testing.T) {
 		{
 			name:       "#6 Неверный JSON",
 			method:     http.MethodPost,
-			url:        "/addUser",
+			url:        "/user",
 			body:       args{bytes.NewBufferString(`{"par": "1214 561890"}`)},
 			mockCreate: func() {},
 			wantStatus: http.StatusBadRequest,
@@ -173,7 +173,7 @@ func TestHandlerDelete(t *testing.T) {
 		{
 			name:   "#1 Успешный запрос",
 			method: http.MethodDelete,
-			url:    "/delUser/123",
+			url:    "/user/123",
 			mockCreate: func() {
 				mockUseCase.EXPECT().UseCaseDelete(gomock.Any()).Return(nil)
 			},
@@ -182,14 +182,14 @@ func TestHandlerDelete(t *testing.T) {
 		{
 			name:       "#2 Неправильный метод",
 			method:     http.MethodPost,
-			url:        "/delUser/123",
+			url:        "/user/123",
 			mockCreate: func() {},
 			wantStatus: http.StatusMethodNotAllowed,
 		},
 		{
 			name:       "#3 Некорректный ID",
 			method:     http.MethodDelete,
-			url:        "/delUser/fdg",
+			url:        "/user/fdg",
 			mockCreate: func() {},
 			wantStatus: http.StatusUnprocessableEntity,
 		},
@@ -244,7 +244,7 @@ func TestHandlerUpdate(t *testing.T) {
 		{
 			name:   "#1 Успешный запрос",
 			method: http.MethodPut,
-			url:    "/updUser/1",
+			url:    "/user/1",
 			body:   args{bytes.NewBufferString(`{"id": "1", "surname": "dfd"}`)},
 			mockCreate: func() {
 				mockUseCase.EXPECT().UseCaseUpdate(gomock.Any(), gomock.Any()).Return(nil)
@@ -252,25 +252,17 @@ func TestHandlerUpdate(t *testing.T) {
 			wantStatus: http.StatusOK,
 		},
 		{
-			name:       "#2 Неверный метод запроса",
-			method:     http.MethodGet,
-			url:        "/updUser/1",
-			body:       args{bytes.NewBufferString(`{"UserID": "1", "Surname": "dfd"}`)},
-			mockCreate: func() {},
-			wantStatus: http.StatusMethodNotAllowed,
-		},
-		{
-			name:       "#3 Ошибка ID",
+			name:       "#2 Ошибка ID",
 			method:     http.MethodPut,
-			url:        "/updUser/f",
+			url:        "/user/f",
 			body:       args{bytes.NewBufferString(`{"UserID": "1", "Surname": "dfd"}`)},
 			mockCreate: func() {},
 			wantStatus: http.StatusUnprocessableEntity,
 		},
 		{
-			name:       "#5 Ошибка декодирования тела запроса",
+			name:       "#3 Ошибка декодирования тела запроса",
 			method:     http.MethodPut,
-			url:        "/updUser/1",
+			url:        "/user/1",
 			body:       args{bytes.NewBufferString(`{"UserID": "1", "Surname": "dfd"}`)},
 			mockCreate: func() {},
 			wantStatus: http.StatusBadRequest,
@@ -322,7 +314,7 @@ func TestHandlerGetUser(t *testing.T) {
 		{
 			name:   "#1 Успешный запрос",
 			method: http.MethodGet,
-			url:    "/getUser/1",
+			url:    "/user/1",
 			mockCreate: func() {
 				mockUseCase.EXPECT().UseCaseRead(gomock.Any()).Return(models.UserData{}, nil)
 			},
@@ -331,7 +323,7 @@ func TestHandlerGetUser(t *testing.T) {
 		{
 			name:   "#2 Неправильный метод",
 			method: http.MethodPost,
-			url:    "/getUser/1",
+			url:    "/user/1",
 			mockCreate: func() {
 			},
 			wantStatus: http.StatusMethodNotAllowed,
@@ -339,7 +331,7 @@ func TestHandlerGetUser(t *testing.T) {
 		{
 			name:   "#3 Неверный ID",
 			method: http.MethodGet,
-			url:    "/getUser/а",
+			url:    "/user/а",
 			mockCreate: func() {
 			},
 			wantStatus: http.StatusUnprocessableEntity,
@@ -395,7 +387,7 @@ func TestHandlerGetUsers(t *testing.T) {
 		{
 			name:   "#1 Успешный запрос",
 			method: http.MethodPost,
-			url:    "/getUsers/1/5",
+			url:    "/users/1/5",
 			body:   args{bytes.NewBufferString(`{"name": "name"}`)},
 			mockCreate: func() {
 				mockUseCase.EXPECT().UseCaseGetUsers(gomock.Any(), 1, 5).Return([]models.UserData{}, nil)
@@ -405,7 +397,7 @@ func TestHandlerGetUsers(t *testing.T) {
 		{
 			name:       "#2 Неверный метод",
 			method:     http.MethodGet,
-			url:        "/getUsers/1/5",
+			url:        "/users/1/5",
 			body:       args{bytes.NewBufferString(`{"name": "name"}`)},
 			mockCreate: func() {},
 			wantStatus: http.StatusMethodNotAllowed,
@@ -413,7 +405,7 @@ func TestHandlerGetUsers(t *testing.T) {
 		{
 			name:       "#3 Неправильное тело запроса",
 			method:     http.MethodPost,
-			url:        "/getUsers/1/5",
+			url:        "/users/1/5",
 			body:       args{bytes.NewBufferString(`{"name": "name}`)},
 			mockCreate: func() {},
 			wantStatus: http.StatusInternalServerError,
@@ -421,7 +413,7 @@ func TestHandlerGetUsers(t *testing.T) {
 		{
 			name:       "#4 Неверные поля в теле запроса",
 			method:     http.MethodPost,
-			url:        "/getUsers/1/5",
+			url:        "/users/1/5",
 			body:       args{bytes.NewBufferString(`{"nae": "name"}`)},
 			mockCreate: func() {},
 			wantStatus: http.StatusInternalServerError,
@@ -477,7 +469,7 @@ func TestHandlerAddTask(t *testing.T) {
 		{
 			name:   "#1 Успешный запрос",
 			method: http.MethodPost,
-			url:    "/addTask/1",
+			url:    "/task/1",
 			body:   args{bytes.NewBufferString(`{"task_name": "name"}`)},
 			mockCreate: func() {
 				mockUseCase.EXPECT().UseCaseCreateTask(gomock.Any(), gomock.Any()).Return(1, nil)
@@ -487,7 +479,7 @@ func TestHandlerAddTask(t *testing.T) {
 		{
 			name:       "#2 Неверный метод",
 			method:     http.MethodGet,
-			url:        "/addTask/1",
+			url:        "/task/1",
 			body:       args{bytes.NewBufferString(`{"task_name": "name"}`)},
 			mockCreate: func() {},
 			wantStatus: http.StatusMethodNotAllowed,
@@ -495,7 +487,7 @@ func TestHandlerAddTask(t *testing.T) {
 		{
 			name:       "#3 Неверный ID",
 			method:     http.MethodPost,
-			url:        "/addTask/d",
+			url:        "/task/d",
 			body:       args{bytes.NewBufferString(`{"task_name": "name"}`)},
 			mockCreate: func() {},
 			wantStatus: http.StatusUnprocessableEntity,
@@ -503,7 +495,7 @@ func TestHandlerAddTask(t *testing.T) {
 		{
 			name:       "#4 Неверне тело запроса",
 			method:     http.MethodPost,
-			url:        "/addTask/1",
+			url:        "/task/1",
 			body:       args{bytes.NewBufferString(`{"task_name": "name}`)},
 			mockCreate: func() {},
 			wantStatus: http.StatusInternalServerError,
@@ -511,7 +503,7 @@ func TestHandlerAddTask(t *testing.T) {
 		{
 			name:       "#5 Неверные поля запроса",
 			method:     http.MethodPost,
-			url:        "/addTask/1",
+			url:        "/task/1",
 			body:       args{bytes.NewBufferString(`{"taskme": "name"}`)},
 			mockCreate: func() {},
 			wantStatus: http.StatusInternalServerError,
@@ -563,7 +555,7 @@ func TestHandlerStartTime(t *testing.T) {
 		{
 			name:   "#1 Успешный запрос",
 			method: http.MethodPut,
-			url:    "/addTask/startTime/1",
+			url:    "/task/start/1",
 			mockCreate: func() {
 				mockUseCase.EXPECT().UseCaseAddStartTime(gomock.Any()).Return(nil)
 			},
@@ -572,14 +564,14 @@ func TestHandlerStartTime(t *testing.T) {
 		{
 			name:       "#2 Неверный метод",
 			method:     http.MethodPost,
-			url:        "/addTask/startTime/1",
+			url:        "/task/start/1",
 			mockCreate: func() {},
 			wantStatus: http.StatusMethodNotAllowed,
 		},
 		{
 			name:       "#3 Некорректный TaskID",
 			method:     http.MethodPut,
-			url:        "/addTask/startTime/trt",
+			url:        "/task/start/trt",
 			mockCreate: func() {},
 			wantStatus: http.StatusUnprocessableEntity,
 		},
@@ -632,7 +624,7 @@ func TestHandlerEndTime(t *testing.T) {
 		{
 			name:   "#1 Успешный запрос",
 			method: http.MethodPut,
-			url:    "/addTask/endTime/1",
+			url:    "/task/end/1",
 			mockCreate: func() {
 				mockUseCase.EXPECT().UseCaseAddEndTime(gomock.Any()).Return(nil)
 			},
@@ -641,14 +633,14 @@ func TestHandlerEndTime(t *testing.T) {
 		{
 			name:       "#2 Неверный метод",
 			method:     http.MethodPost,
-			url:        "/addTask/endTime/1",
+			url:        "/task/end/1",
 			mockCreate: func() {},
 			wantStatus: http.StatusMethodNotAllowed,
 		},
 		{
 			name:       "#3 Некорректный TaskID",
 			method:     http.MethodPut,
-			url:        "/addTask/endTime/trt",
+			url:        "/task/end/trt",
 			mockCreate: func() {},
 			wantStatus: http.StatusUnprocessableEntity,
 		},
@@ -704,7 +696,7 @@ func TestHandlerGetTasks(t *testing.T) {
 		{
 			name:   "#1 Успешный запрос",
 			method: http.MethodPost,
-			url:    "/getTasks/1",
+			url:    "/tasks/1",
 			body:   args{bytes.NewBufferString(`{"start": "12.12.2024"}`)},
 			mockCreate: func() {
 				mockUseCase.EXPECT().UseCaseGetTasksUser(gomock.Any(), gomock.Any()).Return([]models.Tasks{}, nil)
@@ -714,7 +706,7 @@ func TestHandlerGetTasks(t *testing.T) {
 		{
 			name:       "#2 Неверный метод",
 			method:     http.MethodGet,
-			url:        "/getTasks/1",
+			url:        "/tasks/1",
 			body:       args{bytes.NewBufferString(`{"start": "12.12.2024"}`)},
 			mockCreate: func() {},
 			wantStatus: http.StatusMethodNotAllowed,
@@ -722,7 +714,7 @@ func TestHandlerGetTasks(t *testing.T) {
 		{
 			name:       "#3 Неправильное тело запроса",
 			method:     http.MethodPost,
-			url:        "/getTasks/1",
+			url:        "/tasks/1",
 			body:       args{bytes.NewBufferString(`{"start": "12.12.2024}`)},
 			mockCreate: func() {},
 			wantStatus: http.StatusInternalServerError,
@@ -730,7 +722,7 @@ func TestHandlerGetTasks(t *testing.T) {
 		{
 			name:       "#4 Неверные поля в теле запроса",
 			method:     http.MethodPost,
-			url:        "/getTasks/1",
+			url:        "/tasks/1",
 			body:       args{bytes.NewBufferString(`{"startdsf": "12.12.2024"}`)},
 			mockCreate: func() {},
 			wantStatus: http.StatusInternalServerError,
@@ -738,7 +730,7 @@ func TestHandlerGetTasks(t *testing.T) {
 		{
 			name:       "#4 Невлидные поля в теле запроса",
 			method:     http.MethodPost,
-			url:        "/getTasks/1",
+			url:        "/tasks/1",
 			body:       args{bytes.NewBufferString(`{"start": "12.авы.2024"}`)},
 			mockCreate: func() {},
 			wantStatus: http.StatusInternalServerError,
