@@ -6,6 +6,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	httpSwagger "github.com/swaggo/http-swagger/v2"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -28,35 +29,35 @@ func InitRoutes(useCase usecase.UseCaseStorage, conf *config.Config) chi.Router 
 		httpSwagger.URL("http://"+conf.SERVER_HOST+":"+conf.SERVER_PORT+"/swagger/doc.json"), //The url pointing to API definition
 	))
 
-	r.Post("/addUser", func(w http.ResponseWriter, r *http.Request) {
+	r.Post("/user", func(w http.ResponseWriter, r *http.Request) {
 		HandlerAddUser(w, r, useCase, conf)
 	})
-	r.Delete("/delUser/{userID}", func(w http.ResponseWriter, r *http.Request) {
+	r.Delete("/user/{userID}", func(w http.ResponseWriter, r *http.Request) {
 		HandlerDelete(w, r, useCase)
 	})
-	r.Put("/updUser/{userID}", func(w http.ResponseWriter, r *http.Request) {
+	r.Put("/user/{userID}", func(w http.ResponseWriter, r *http.Request) {
 		HandlerUpdate(w, r, useCase)
 	})
-	r.Get("/getUser/{userID}", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/user/{userID}", func(w http.ResponseWriter, r *http.Request) {
 		HandlerGetUser(w, r, useCase)
 	})
-	r.Post("/getUsers/{page}/{limit}", func(w http.ResponseWriter, r *http.Request) {
+	r.Post("/users/{page}/{limit}", func(w http.ResponseWriter, r *http.Request) {
 		HandlerGetUsers(w, r, useCase)
 	})
-	r.Post("/addTask/{userID}", func(w http.ResponseWriter, r *http.Request) {
+	r.Post("/task/{userID}", func(w http.ResponseWriter, r *http.Request) {
 		HandlerAddTask(w, r, useCase)
 	})
-	r.Put("/addTask/startTime/{taskID}", func(w http.ResponseWriter, r *http.Request) {
+	r.Put("/task/start/{taskID}", func(w http.ResponseWriter, r *http.Request) {
 		HandlerStartTime(w, r, useCase)
 	})
-	r.Put("/addTask/endTime/{taskID}", func(w http.ResponseWriter, r *http.Request) {
+	r.Put("/task/end/{taskID}", func(w http.ResponseWriter, r *http.Request) {
 		HandlerEndTime(w, r, useCase)
 	})
-	r.Post("/getTasks/{userID}", func(w http.ResponseWriter, r *http.Request) {
+	r.Post("/tasks/{userID}", func(w http.ResponseWriter, r *http.Request) {
 		HandlerGetTasks(w, r, useCase)
 	})
 	///тесты
-	r.Post("/testAdd", func(w http.ResponseWriter, r *http.Request) {
+	r.Post("/test", func(w http.ResponseWriter, r *http.Request) {
 		HandlerCreat(w, r, useCase)
 	})
 
@@ -75,7 +76,7 @@ func InitRoutes(useCase usecase.UseCaseStorage, conf *config.Config) chi.Router 
 // @Failure 422 {string} string "Ошибка валидации серии паспорта или номера паспорта"
 // @Failure 500 {string} string "Ошибка сервера"
 // @Failure 503 {string} string "Ошибка запроса к стороннему API"
-// @Router /addUser [post]
+// @Router /user [post]
 func HandlerAddUser(w http.ResponseWriter, r *http.Request, useCase usecase.UseCaseStorage, conf *config.Config) {
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -155,7 +156,7 @@ func HandlerAddUser(w http.ResponseWriter, r *http.Request, useCase usecase.UseC
 // @Failure 409 {string} string "Ошибка записи: Пользователь с таким номером паспорта уже существует"
 // @Failure 422 {string} string "Ошибка валидации серии паспорта или номера паспорта"
 // @Failure 500 {string} string "Ошибка сервера"
-// @Router	/testAdd [post]
+// @Router	/test [post]
 func HandlerCreat(w http.ResponseWriter, r *http.Request, useCase usecase.UseCaseStorage) {
 	var req models.PassportRequest
 	dec := json.NewDecoder(r.Body)
@@ -230,7 +231,7 @@ func HandlerCreat(w http.ResponseWriter, r *http.Request, useCase usecase.UseCas
 // @Failure 404 {string} string "Пользователь не найден"
 // @Failure 422 {string} string "Ошибка конвертирования ID"
 // @Failure 500 {string} string "Ошибка сервера"
-// @Router /delUser/{userID} [delete]
+// @Router /user/{userID} [delete]
 func HandlerDelete(w http.ResponseWriter, r *http.Request, useCase usecase.UseCaseStorage) {
 	if r.Method != http.MethodDelete {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -274,7 +275,7 @@ func HandlerDelete(w http.ResponseWriter, r *http.Request, useCase usecase.UseCa
 // @Failure 409 {string} string "Ошибка записи: Пользователь с таким номером паспорта уже существует"
 // @Failure 422 {string} string "Ошибка конвертирования ID"
 // @Failure 500 {string} string "Ошибка сервера"
-// @Router /updUser/{userID} [put]
+// @Router /user/{userID} [patch]
 func HandlerUpdate(w http.ResponseWriter, r *http.Request, useCase usecase.UseCaseStorage) {
 	if r.Method != http.MethodPut {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -348,7 +349,7 @@ func HandlerUpdate(w http.ResponseWriter, r *http.Request, useCase usecase.UseCa
 // @Failure 404 {string} string "Пользователь не найден"
 // @Failure 422 {string} string "Ошибка конвертирования ID"
 // @Failure 500 {string} string "Ошибка сервера"
-// @Router /getUser/{userID} [get]
+// @Router /user/{userID} [get]
 func HandlerGetUser(w http.ResponseWriter, r *http.Request, useCase usecase.UseCaseStorage) {
 	if r.Method != http.MethodGet {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -398,7 +399,7 @@ func HandlerGetUser(w http.ResponseWriter, r *http.Request, useCase usecase.UseC
 // @Param body body models.UserData false "Фильтр пользователей (выбираем по каким полям будет фильтрация, вписываем туда ключ фильтра. Ненужные делаем пусытими или удаляем)"
 // @Success 200 {array} models.UserData "Успешный ответ с данными пользователей"
 // @Failure 500 {string} string "Ошибка сервера"
-// @Router /getUsers/{page}/{limit} [post]
+// @Router /users/{page}/{limit} [post]
 func HandlerGetUsers(w http.ResponseWriter, r *http.Request, useCase usecase.UseCaseStorage) {
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -469,7 +470,7 @@ func HandlerGetUsers(w http.ResponseWriter, r *http.Request, useCase usecase.Use
 // @Failure 404 {string} string "Пользователь не найден"
 // @Failure 422 {string} string "Ошибка конвертирования UserID"
 // @Failure 500 {string} string "Ошибка сервера"
-// @Router /addTask/{userID} [post]
+// @Router /task/{userID} [post]
 func HandlerAddTask(w http.ResponseWriter, r *http.Request, useCase usecase.UseCaseStorage) {
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -536,7 +537,7 @@ func HandlerAddTask(w http.ResponseWriter, r *http.Request, useCase usecase.UseC
 // @Failure 409 {string} string "Время начала уже установлено"
 // @Failure 422 {string} string "Ошибка Task ID"
 // @Failure 500 {string} string "Ошибка сервера"
-// @Router /addTask/startTime/{taskID} [put]
+// @Router /task/start/{taskID} [put]
 func HandlerStartTime(w http.ResponseWriter, r *http.Request, useCase usecase.UseCaseStorage) {
 	if r.Method != http.MethodPut {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -581,7 +582,7 @@ func HandlerStartTime(w http.ResponseWriter, r *http.Request, useCase usecase.Us
 // @Failure 422 {string} string "Ошибка Task ID"
 // @Failure 428 {string} string "Не заполнено поле StartTime"
 // @Failure 500 {string} string "Ошибка сервера"
-// @Router /addTask/endTime/{taskID} [put]
+// @Router /task/end/{taskID} [put]
 func HandlerEndTime(w http.ResponseWriter, r *http.Request, useCase usecase.UseCaseStorage) {
 	if r.Method != http.MethodPut {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -628,7 +629,7 @@ func HandlerEndTime(w http.ResponseWriter, r *http.Request, useCase usecase.UseC
 // @Failure 404 {string} string "Данные не найдены"
 // @Failure 422 {string} string "Неправильный ID пользователя"
 // @Failure 500 {string} string "Ошибка сервера"
-// @Router /getTasks/{userID} [post]
+// @Router /tasks/{userID} [post]
 func HandlerGetTasks(w http.ResponseWriter, r *http.Request, useCase usecase.UseCaseStorage) {
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -658,8 +659,12 @@ func HandlerGetTasks(w http.ResponseWriter, r *http.Request, useCase usecase.Use
 	if period.Start == "" {
 		period.Start = "01.01.1900"
 	}
+
+	today := time.Now()
+	tomorrow := today.AddDate(0, 0, 1)
+
 	if period.End == "" {
-		period.End = time.Now().Format("02.01.2006")
+		period.End = tomorrow.Format("02.01.2006")
 	}
 
 	// Преобразуем строки Start и End в тип time.Time
@@ -677,6 +682,8 @@ func HandlerGetTasks(w http.ResponseWriter, r *http.Request, useCase usecase.Use
 	}
 	period.Start = sTime.Format("2006-01-02 15:04:05")
 	period.End = eTime.Format("2006-01-02 15:04:05")
+
+	log.Println(period.Start, period.End)
 
 	userData, err := useCase.UseCaseGetTasksUser(userID, period)
 
