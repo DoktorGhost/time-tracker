@@ -1,3 +1,7 @@
+<p align="left">
+      <img src="https://i.ibb.co/cYzQsPG/logoza-ru.png" alt="Project Logo" width="726">
+</p>
+
 # Тайм-трекер
 
 ### Настройка переменных окружения
